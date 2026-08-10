@@ -1,0 +1,7 @@
+river,project,role,latitude,longitude,anchor_gage,anchor_gage_name,coord_source
+Chattahoochee River,Lanier,inflow,34.35315586,-83.8146232,02332510,"CHATTAHOOCHEE RIVER AT GA 129, AB GAINESVILLE, GA",USGS NWIS site service
+Chestatee River,Lanier,inflow,34.4289849,-83.9740749,02334000,"CHESTATEE RIVER AT NEW BRIDGE, GA",USGS NWIS site service
+Chattahoochee River,Lanier,outflow,34.15666667,-84.0784167,02334430,"CHATTAHOOCHEE RIVER AT BUFORD DAM, NEAR BUFORD, GA",USGS NWIS site service
+Etowah River,Allatoona,inflow,34.24019444,-84.4945278,02392000,"ETOWAH RIVER AT CANTON, GA",USGS NWIS site service
+Little River,Allatoona,inflow,34.11926438,-84.38825969,02392500,"LITTLE RIVER NEAR ROSWELL, GA",USGS NWIS site service
+Etowah River,Allatoona,outflow,34.1629722,-84.7410833,02394000,"ETOWAH RIVER AT ALLATOONA DAM, ABV CARTERSVILLE, GA",USGS NWIS site service

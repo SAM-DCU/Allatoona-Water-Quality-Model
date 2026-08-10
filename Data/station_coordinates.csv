@@ -1,0 +1,5 @@
+station_id,station_name,project,station_type,latitude,longitude,datum,coord_source,coord_method
+21GAEPD_WQX-LK_12_4028,Lake Sidney Lanier upstream of Buford Dam Forebay,Lanier,forebay_profile,34.1628,-84.0671,WGS84,EPA Water Quality Portal Station service,GPS-Unspecified
+21GAEPD_WQX-LK_14_4494,Lake Allatoona Upstream from Dam,Allatoona,forebay_profile,34.1608,-84.7258,WGS84,EPA Water Quality Portal Station service,GPS-Unspecified
+02334430,"CHATTAHOOCHEE RIVER AT BUFORD DAM, NEAR BUFORD, GA",Lanier,tailrace,34.15666667,-84.0784167,NAD83,USGS NWIS site service,N
+02394000,"ETOWAH RIVER AT ALLATOONA DAM, ABV CARTERSVILLE, GA",Allatoona,tailrace,34.1629722,-84.7410833,NAD83,USGS NWIS site service,M
