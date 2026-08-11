@@ -4,7 +4,7 @@ A U.S. Army Corps of Engineers (USACE) Mobile District (SAM) repository holding 
 
 That remains the aim of the work. The repository has since grown to cover Lake Sidney Lanier and Buford Dam as well, whose Chattahoochee River tailwater is the companion case, so the datasets and scripts here are organized for the two projects side by side.
 
-The repository currently holds data, scripts, and references. It does not contain models, model results, or a written report.
+The repository currently holds data, scripts, references, and the figures the scripts produce. It does not contain models, model results, or a written report.
 
 ## 1. Directory layout
 
@@ -13,8 +13,9 @@ The repository currently holds data, scripts, and references. It does not contai
 | `Data/` | 32 data files: continuous tailwater records for both projects, in-pool forebay profiles, U.S. Geological Survey (USGS) daily values, earlier Mobile District files, and map inputs |
 | `Scripts/` | 5 R retrieval scripts at the top level and 11 Python scripts in `Scripts/python/` |
 | `references/` | Local copies of the Allatoona and Buford Water Control Manuals (WCMs) |
+| `analysis/` | 379 figure, profile, and map images written by the Python scripts, with an index to the profile plots |
 
-Analysis scripts write their figures, statistics files, and maps into `analysis/` and `report/` directories that they create on demand. Those outputs are not tracked in this repository.
+The scripts also write statistics files into `analysis/` and build products into a `report/` directory they create on demand. Those are not tracked here; the images are.
 
 ## 2. Data
 
@@ -55,7 +56,21 @@ The R scripts retrieve USGS daily values through the `dataRetrieval` package and
 
 The Python scripts need a scientific Python stack: pandas, numpy, scipy, matplotlib, folium, selenium, and Pillow. `Scripts/README.md` names the specific conda environment the project uses. The station map script also drives headless Chrome for its PNG export.
 
-## 4. Reference documents
+## 4. Figures
+
+`analysis/` holds the images the Python scripts produce. Rerunning a script overwrites them, so treat the scripts rather than these files as the record of how a figure was made.
+
+| Path | Contents |
+|---|---|
+| `analysis/figures/` | 11 numbered figures: forebay structure, release temperature regime, and tailrace DO |
+| `analysis/figures/forebay_profiles/` | 313 dated temperature and DO profile plots, 144 for Allatoona and 169 for Lanier, plus 49 per-year contact sheets |
+| `analysis/maps/` | 6 station location maps, plain and satellite, for each project and for the two together |
+
+`analysis/figures/forebay_profiles/profile_index.csv` lists every dated profile plot by lake, station, and date, with the summary values behind it: profile depth, peak temperature gradient, and surface, bottom, and minimum DO.
+
+The numbered figures run 1, 2, 2b, 4, 5, and 8 through 12. Figures 3, 6, and 7 come from the withdrawal-depth analysis, which is not part of this repository; `Scripts/README.md` notes the same gap.
+
+## 5. Reference documents
 
 Both WCMs are the source of the Georgia water quality criteria applied in the analysis.  Local copies are in `references/`.
 
