@@ -143,8 +143,9 @@ def cast_stats(cast: pd.DataFrame) -> dict[str, Any]:
     -------
     dict
         ``n_points`` (rows in the cast, including any that carry only one variable),
-        ``z_max_m`` (m), ``T_surface_C`` and ``T_bottom_C`` (deg C), ``DO_surface_mgL``
-        and ``DO_bottom_mgL`` (mg/L), ``DO_min_mgL`` (mg/L).
+        ``n_complete`` (rows carrying both temperature and oxygen), ``z_max_m`` (m),
+        ``peak_dTdz_Cm`` (deg C/m), ``T_surface_C`` and ``T_bottom_C`` (deg C),
+        ``DO_surface_mgL`` and ``DO_bottom_mgL`` (mg/L), ``DO_min_mgL`` (mg/L).
 
     Notes
     -----
@@ -153,18 +154,24 @@ def cast_stats(cast: pd.DataFrame) -> dict[str, Any]:
     independently. A cast whose deepest DO sample sits above its deepest temperature
     sample therefore reports the two bottom values from different depths.
 
-    ``n_points`` counts every row of the cast. plot_figures.py selects fig1's cast on
-    the count of rows complete in both variables, so the selection this script prints
-    at the end can in principle differ from the figure's. On the present record they
-    agree: 2005-08-10 at Lanier, 2025-08-18 at Allatoona.
+    ``n_points`` counts every row of the cast; ``n_complete`` counts only the rows
+    carrying both variables, which is the count plot_figures.py applies its eligibility
+    floor to. ``peak_dTdz_Cm`` is the largest single-interval temperature decrease per
+    metre, the statistic on which fig1's cast is selected, and is NaN for a cast with
+    fewer than two temperature samples.
     """
     do = cast.dropna(subset=["DO_mgL"])
-    t = cast.dropna(subset=["Temp_C"])
+    t = cast.dropna(subset=["Temp_C"]).sort_values("Depth_m")
 
     def first_or_nan(d: pd.DataFrame, col: str, i: int) -> float:
         return float(d[col].iloc[i]) if len(d) else np.nan
 
-    return dict(n_points=len(cast), z_max_m=float(cast.Depth_m.max()),
+    peak = (float((-np.diff(t.Temp_C.values) / np.diff(t.Depth_m.values)).max())
+            if len(t) > 1 else np.nan)
+
+    return dict(n_points=len(cast),
+                n_complete=len(cast.dropna(subset=["Temp_C", "DO_mgL"])),
+                z_max_m=float(cast.Depth_m.max()), peak_dTdz_Cm=peak,
                 T_surface_C=first_or_nan(t, "Temp_C", 0),
                 T_bottom_C=first_or_nan(t, "Temp_C", -1),
                 DO_surface_mgL=first_or_nan(do, "DO_mgL", 0),
@@ -232,13 +239,24 @@ idx_path = os.path.join(OUT, "profile_index.csv")
 idx.to_csv(idx_path, index=False, float_format="%.2f")
 print(f"\nwrote {os.path.relpath(idx_path, REPO)} ({len(idx)} casts)")
 
-# The report's fig1 selects the most complete late-summer (August-September) cast per lake;
-# list the current selection so the gallery and the report figure stay traceable to each other.
-# See cast_stats on why this count and plot_figures.py's can differ in principle.
-late = idx[idx.month.isin([8, 9])]
+# The report's fig1 takes, from the casts complete enough to draw, the one whose peak
+# temperature gradient is closest to the median for the selection month. Mirror that rule
+# here so the gallery and the report figure stay traceable to each other; the three
+# constants below must match plot_figures.py.
+FIG1_MONTHS = [8]
+MIN_CAST_POINTS = 15
+MIN_CAST_DEPTH_FRAC = 0.75
+
+late = idx[idx.month.isin(FIG1_MONTHS)]
 for key in FOREBAY:
-    sel = late[late.lake == key].sort_values(["n_points", "z_max_m"])
-    if len(sel):
-        r = sel.iloc[-1]
-        print(f"fig1 late-summer selection, {key}: {r.date} "
-              f"({int(r.n_points)} points, {r.z_max_m:.0f} m)")
+    lake = late[late.lake == key]
+    sel = lake[(lake.n_complete >= MIN_CAST_POINTS)
+               & (lake.z_max_m >= MIN_CAST_DEPTH_FRAC * lake.z_max_m.max())]
+    if not len(sel):
+        print(f"fig1 selection, {key}: no cast clears the eligibility floor")
+        continue
+    med = sel.peak_dTdz_Cm.median()
+    r = sel.loc[(sel.peak_dTdz_Cm - med).abs().idxmin()]
+    print(f"fig1 selection, {key}: {r.date} ({int(r.n_complete)} complete points, "
+          f"{r.z_max_m:.0f} m, peak dT/dz {r.peak_dTdz_Cm:.2f} C/m; "
+          f"median of {len(sel)} eligible casts {med:.2f})")

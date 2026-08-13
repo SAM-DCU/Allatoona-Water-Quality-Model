@@ -50,7 +50,18 @@ plt.rcParams.update({"font.size": 9, "axes.grid": True, "grid.alpha": 0.25,
 # Month groupings used across this study, 1-based, and the meteorological seasons.
 SUMMER = [6, 7, 8, 9]        # Jun-Sep, "summer" in the report
 LATE_SUMMER = [7, 8, 9]      # Jul-Sep, "late summer" in the report
-PEAK_STRATIFICATION = [8, 9]  # Aug-Sep, from which fig1's representative cast is drawn
+# fig1's representative cast is drawn from August alone. September was included until a
+# seasonal breakdown showed the two lakes diverge within late summer: the median peak
+# temperature gradient at Allatoona falls from 1.13 deg C/m in August to 0.57 in
+# September as the thermocline erodes, while Lanier holds 3.34 and 3.15. Pooling the two
+# months gives Allatoona a median of 0.80, which describes neither of them.
+PEAK_STRATIFICATION = [8]
+
+# Eligibility floor for the representative cast: a cast must carry at least this many
+# depth observations complete in both temperature and oxygen, and must reach at least
+# this fraction of the deepest cast in the selection months.
+MIN_CAST_POINTS = 15
+MIN_CAST_DEPTH_FRAC = 0.75
 SEASONS = {"DJF": [12, 1, 2], "MAM": [3, 4, 5], "JJA": [6, 7, 8], "SON": [9, 10, 11]}
 
 # A day counts as diel-complete at this many sub-hourly observations. The Allatoona
@@ -105,19 +116,27 @@ def q(s, p: float) -> float:
 
 def select_representative_cast(df: pd.DataFrame,
                                months: Sequence[int] = PEAK_STRATIFICATION) -> pd.Timestamp:
-    """Date of the most complete cast in the given months.
+    """Date of the cast whose stratification is most typical of the given months.
 
-    Completeness is the number of depth observations carrying both temperature and
-    oxygen; the deepest cast wins a tie. Selecting on completeness rather than on a
-    fixed date keeps the figure representative when a year's late-summer cast is short.
+    Eligibility is settled first: a cast must carry at least MIN_CAST_POINTS depth
+    observations complete in both temperature and oxygen, and must reach
+    MIN_CAST_DEPTH_FRAC of the deepest cast in those months. Among the eligible casts,
+    the one returned is that whose peak temperature gradient lies closest to the median
+    peak temperature gradient of the eligible set.
+
+    An earlier version ranked on completeness alone and returned the deepest, most
+    finely sampled cast. Completeness is not typicality. At Allatoona that rule returned
+    a profile with no mixed layer, whose peak gradient of 0.80 deg C/m sits below the
+    August interquartile range of 0.92 to 1.40, so the figure understated the thermocline
+    that the surrounding text describes and made the sharp oxycline look unsupported by
+    the temperature structure.
 
     Parameters
     ----------
     df : pandas.DataFrame
         Forebay profiles as returned by :func:`load_profiles`.
     months : sequence of int, optional
-        Calendar months to choose from, 1-based. Defaults to August and September, the
-        period of peak stratification at both reservoirs.
+        Calendar months to choose from, 1-based. Defaults to PEAK_STRATIFICATION.
 
     Returns
     -------
@@ -126,17 +145,34 @@ def select_representative_cast(df: pd.DataFrame,
 
     Notes
     -----
-    forebay_profile_gallery.py renders every cast in this style and prints the cast it
-    would select, so the choice can be checked against the whole record. Its count is
-    of all rows in a cast rather than of rows complete in both variables, so the two
-    selections agree only while no cast reports one variable much more often than the
-    other. They agree on the present record: 2005-08-10 at Lanier, 2025-08-18 at
-    Allatoona.
+    The peak gradient is the largest single-interval temperature decrease per metre, so
+    it is sensitive to the vertical sampling interval: a sparsely sampled cast has wide
+    intervals and a smoothed gradient. The completeness floor keeps such casts out of
+    the comparison rather than letting them depress the median.
+
+    If no cast clears the floor the function falls back to the completeness ranking
+    rather than raising, so a thin record still yields a figure.
+
+    forebay_profile_gallery.py mirrors this selection and prints the cast it would
+    choose, so the gallery and the report figure stay traceable to each other.
     """
     late = df[df.month.isin(months)].dropna(subset=["Temp_C","DO_mgL"])
-    best = (late.groupby("Date")
-                .agg(n=("Depth_m","size"), zmax=("Depth_m","max")))
-    return best.sort_values(["n","zmax"]).index[-1]
+    z_deepest = late.Depth_m.max()
+    dates: list[pd.Timestamp] = []
+    peaks: list[float] = []
+    for date, g in late.groupby("Date"):
+        g = g.sort_values("Depth_m")
+        if len(g) < MIN_CAST_POINTS or g.Depth_m.max() < MIN_CAST_DEPTH_FRAC * z_deepest:
+            continue
+        z, t = g.Depth_m.values, g.Temp_C.values
+        dates.append(date)
+        peaks.append(float((-np.diff(t) / np.diff(z)).max()))
+    if not dates:
+        return (late.groupby("Date")
+                    .agg(n=("Depth_m","size"), zmax=("Depth_m","max"))
+                    .sort_values(["n","zmax"]).index[-1])
+    p = np.asarray(peaks)
+    return dates[int(np.argmin(np.abs(p - np.median(p))))]
 
 
 def monthly_depth_mean(df: pd.DataFrame, value: str = "DO_mgL") -> pd.DataFrame:
@@ -239,6 +275,32 @@ cb = fig.colorbar(im, ax=axes, fraction=0.04, pad=0.02); cb.set_label("Mean DO (
 fig.suptitle("Forebay dissolved-oxygen seasonal cycle (monthly mean by depth, full period of record)",
              fontsize=9.5)
 save(fig, "fig2_forebay_do_seasonal")
+
+# ---- Fig 2b: forebay temperature seasonal heatmap, companion to fig2 ----
+# Same grid and depth axis as the oxygen figure, so the two can be read against each
+# other: the thermocline in this figure sits at the depth where the oxygen figure turns
+# anoxic. Temperature is reported on every cast at both stations, where oxygen is
+# missing from one Lanier cast, so this grid rests on slightly more data.
+#
+# Scale: 5 to 30 deg C spans the monthly means at both lakes (7.4 to 28.8 at Lanier,
+# 8.7 to 29.7 at Allatoona) and is held common to both panels so the colors compare.
+# A warm sequential map matches the report convention of red for temperature, and
+# reversing RdYlBu keeps this figure in the same color family as its oxygen companion.
+print("Figure 2b: forebay temperature seasonal pattern")
+fig, axes = plt.subplots(1, 2, figsize=(8.5, 4.6), sharey=True)
+for ax, (lake, df) in zip(axes, prof.items()):
+    piv = monthly_depth_mean(df, value="Temp_C")
+    im = ax.pcolormesh(piv.columns, piv.index, piv.values, cmap="RdYlBu_r",
+                       vmin=5, vmax=30, shading="nearest")
+    ax.set_xlabel("Month"); ax.set_title(lake, fontsize=8.5)
+    ax.set_xticks(range(1,13)); ax.set_xticklabels(list("JFMAMJJASOND"))
+axes[0].set_ylim(50, 0)
+axes[0].set_ylabel("Depth (m)")
+cb = fig.colorbar(im, ax=axes, fraction=0.04, pad=0.02)
+cb.set_label("Mean temperature (°C)")
+fig.suptitle("Forebay temperature seasonal cycle (monthly mean by depth, full period of record)",
+             fontsize=9.5)
+save(fig, "fig2b_forebay_temp_seasonal")
 
 # ---- Fig 9: tailwater DO records (calibration windows) ----
 print("Figure 9: tailwater DO records")
